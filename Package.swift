@@ -5,34 +5,131 @@ let package = Package(
     name: "MLXAudio",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
+        // Core foundation library
+        .library(name: "MLXAudioCore", targets: ["MLXAudioCore"]),
+
+        // Audio codec implementations
+        .library(name: "MLXAudioCodecs", targets: ["MLXAudioCodecs"]),
+
+        // Text-to-Speech
+        .library(name: "MLXAudioTTS", targets: ["MLXAudioTTS"]),
+
+        // Speech-to-Text (placeholder)
+        .library(name: "MLXAudioSTT", targets: ["MLXAudioSTT"]),
+
+        // Speech-to-Speech
+        .library(name: "MLXAudioSTS", targets: ["MLXAudioSTS"]),
+
+        // SwiftUI components
+        .library(name: "MLXAudioUI", targets: ["MLXAudioUI"]),
+
+        // Legacy combined library (for backwards compatibility)
         .library(
             name: "MLXAudio",
-            targets: ["MLXAudio"]
+            targets: ["MLXAudioCore", "MLXAudioCodecs", "MLXAudioTTS", "MLXAudioSTT", "MLXAudioSTS", "MLXAudioUI"]
         ),
     ],
     dependencies: [
+        .package(url: "https://github.com/ml-explore/mlx-swift.git", branch: "main"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", branch: "main"),
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.1.0")),
-        .package(url: "https://github.com/espeak-ng/espeak-ng-spm.git", from: "1.0.0"),
+        .package(url: "https://github.com/huggingface/swift-huggingface.git", from: "0.5.0")
+
     ],
     targets: [
+        // MARK: - MLXAudioCore
         .target(
-            name: "MLXAudio",
+            name: "MLXAudioCore",
             dependencies: [
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
-                .product(name: "MLXLLM", package: "mlx-swift-lm"),
-                .product(name: "Transformers", package: "swift-transformers"),
-                .product(name: "ESpeakNG", package: "espeak-ng-spm")
             ],
-            path: "mlx_audio_swift/tts/MLXAudio",
-            exclude: ["Preview Content", "Assets.xcassets", "MLXAudioApp.swift", "MLXAudio.entitlements"],
-            resources: [
-                .process("Kokoro/Resources") // Kokoro voices
+            path: "Sources/MLXAudioCore",
+            swiftSettings: [
+                .unsafeFlags(["-Xfrontend", "-warn-concurrency"], .when(configuration: .debug))
             ]
         ),
+
+        // MARK: - MLXAudioCodecs
+        .target(
+            name: "MLXAudioCodecs",
+            dependencies: [
+                "MLXAudioCore",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "HuggingFace", package: "swift-huggingface"),
+            ],
+            path: "Sources/MLXAudioCodecs"
+        ),
+
+        // MARK: - MLXAudioTTS
+        .target(
+            name: "MLXAudioTTS",
+            dependencies: [
+                "MLXAudioCore",
+                "MLXAudioCodecs",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "HuggingFace", package: "swift-huggingface"),
+                .product(name: "Transformers", package: "swift-transformers"),
+            ],
+            path: "Sources/MLXAudioTTS",
+            resources: [
+                .process("Models/Kokoro/Resources"),
+                .process("Models/Orpheus/Resources")
+            ]
+        ),
+
+        // MARK: - MLXAudioSTT
+        .target(
+            name: "MLXAudioSTT",
+            dependencies: [
+                "MLXAudioCore",
+                "MLXAudioCodecs",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+            ],
+            path: "Sources/MLXAudioSTT"
+        ),
+
+        // MARK: - MLXAudioSTS
+        .target(
+            name: "MLXAudioSTS",
+            dependencies: [
+                "MLXAudioCore",
+                "MLXAudioTTS",
+                "MLXAudioSTT",
+                .product(name: "MLX", package: "mlx-swift"),
+            ],
+            path: "Sources/MLXAudioSTS"
+        ),
+
+        // MARK: - MLXAudioUI
+        .target(
+            name: "MLXAudioUI",
+            dependencies: [
+                "MLXAudioCore",
+                "MLXAudioTTS",
+                "MLXAudioSTS",
+                .product(name: "MLX", package: "mlx-swift"),
+            ],
+            path: "Sources/MLXAudioUI"
+        ),
+
+        // MARK: - Tests
         .testTarget(
             name: "MLXAudioTests",
-            dependencies: ["MLXAudio"],
+            dependencies: [
+                "MLXAudioCore",
+                "MLXAudioCodecs",
+                "MLXAudioTTS",
+                "MLXAudioSTT",
+                "MLXAudioSTS",
+            ],
             path: "Tests"
         ),
     ]
