@@ -16,6 +16,8 @@
 import Testing
 import MLX
 import Foundation
+import MLX
+import Foundation
 
 @testable import MLXAudioTTS
 @testable import MLXAudioCodecs
@@ -67,9 +69,11 @@ struct SNACTests {
 //        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
 //    }
 //
+//
 //    func testViewBodyDoesNotCrash() {
 //        _ = ContentView().body
 //    }
+//
 //
 //    func testKokoro() async {
 //        let kokoroTTSModel = KokoroTTSModel()
