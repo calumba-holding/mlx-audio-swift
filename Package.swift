@@ -130,7 +130,10 @@ let package = Package(
                 "MLXAudioSTT",
                 "MLXAudioSTS",
             ],
-            path: "Tests"
+            path: "Tests",
+            resources: [
+                .copy("media")
+            ]
         ),
     ]
 )
