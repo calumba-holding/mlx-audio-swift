@@ -268,12 +268,6 @@ struct ContentView: View {
         .task {
             await viewModel.loadModel()
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                // Reset flag when app becomes active again
-                viewModel.handleAppBecameActive()
-            }
-        }
     }
 
     private var canGenerate: Bool {
