@@ -41,6 +41,11 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             // Stop any existing playback
             stop()
 
+            // Setup audio session for iOS
+            #if os(iOS)
+            AudioSessionManager.shared.setupAudioSession()
+            #endif
+
             // Create new player
             player = try AVAudioPlayer(contentsOf: url)
             player?.delegate = self
@@ -113,6 +118,11 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     /// Start streaming playback - call this before scheduling chunks
     public func startStreaming(sampleRate: Double) {
         stop()
+
+        // Setup audio session for iOS
+        #if os(iOS)
+        AudioSessionManager.shared.setupAudioSession()
+        #endif
 
         audioEngine = AVAudioEngine()
         playerNode = AVAudioPlayerNode()
