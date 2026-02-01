@@ -47,6 +47,8 @@ public enum TTSModelUtils {
             return try await Qwen3Model.fromPretrained(modelRepo)
         case "llama_tts", "llama3_tts", "llama3", "llama", "orpheus", "orpheus_tts":
             return try await LlamaTTSModel.fromPretrained(modelRepo)
+        case "csm", "sesame":
+            return try await MarvisTTSModel.fromPretrained(modelRepo)
         case "soprano_tts", "soprano":
             return try await SopranoModel.fromPretrained(modelRepo)
         default:
@@ -71,6 +73,9 @@ public enum TTSModelUtils {
         }
         if lower.contains("llama") || lower.contains("orpheus") {
             return "llama_tts"
+        }
+        if lower.contains("csm") || lower.contains("sesame") {
+            return "csm"
         }
         return nil
     }
