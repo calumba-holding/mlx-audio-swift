@@ -36,8 +36,14 @@ class STTViewModel {
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
 
+    // Recording state
+    var isRecording: Bool { recorder.isRecording }
+    var recordingDuration: TimeInterval { recorder.recordingDuration }
+    var audioLevel: Float { recorder.audioLevel }
+
     private var model: Qwen3ASRModel?
     private let audioPlayer = AudioPlayerManager()
+    private let recorder = AudioRecorderManager()
     private var cancellables = Set<AnyCancellable>()
     private var generationTask: Task<Void, Never>?
 
@@ -177,9 +183,93 @@ class STTViewModel {
         isGenerating = false
     }
 
+    // MARK: - Recording
+
+    func startRecording() {
+        errorMessage = nil
+        transcriptionText = ""
+        tokensPerSecond = 0
+        peakMemory = 0
+
+        // AVAudioEngine triggers its own system permission prompt when accessing
+        // the input node. Just try to start — if permission is denied, it will throw.
+        do {
+            try recorder.startRecording()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func stopAndTranscribe() {
+        guard let audio = recorder.stopRecording() else {
+            errorMessage = "No audio recorded"
+            return
+        }
+
+        generationTask = Task {
+            await transcribeAudio(audio)
+        }
+    }
+
+    func cancelRecording() {
+        recorder.cancelRecording()
+    }
+
+    private func transcribeAudio(_ audio: MLXArray) async {
+        guard let model = model else {
+            errorMessage = "Model not loaded"
+            return
+        }
+
+        isGenerating = true
+        errorMessage = nil
+        generationProgress = "Transcribing..."
+        tokensPerSecond = 0
+        peakMemory = 0
+
+        do {
+            var tokenCount = 0
+            for try await event in model.generateStream(
+                audio: audio,
+                maxTokens: maxTokens,
+                temperature: temperature,
+                language: language,
+                chunkDuration: chunkDuration
+            ) {
+                try Task.checkCancellation()
+
+                switch event {
+                case .token(let token):
+                    transcriptionText += token
+                    tokenCount += 1
+                    generationProgress = "Transcribing... \(tokenCount) tokens"
+                case .info(let info):
+                    tokensPerSecond = info.tokensPerSecond
+                    peakMemory = info.peakMemoryUsage
+                case .result:
+                    generationProgress = ""
+                }
+            }
+
+            generationProgress = ""
+        } catch is CancellationError {
+            Memory.clearCache()
+            generationProgress = ""
+        } catch {
+            errorMessage = "Transcription failed: \(error.localizedDescription)"
+            generationProgress = ""
+        }
+
+        isGenerating = false
+    }
+
     func stop() {
         generationTask?.cancel()
         generationTask = nil
+
+        if isRecording {
+            recorder.cancelRecording()
+        }
 
         if isGenerating {
             isGenerating = false

@@ -22,13 +22,13 @@ struct STTView: View {
             // Transcription result area
             ScrollViewReader { proxy in
                 ScrollView {
-                    if viewModel.transcriptionText.isEmpty && !viewModel.isGenerating {
+                    if viewModel.transcriptionText.isEmpty && !viewModel.isGenerating && !viewModel.isRecording {
                         VStack(spacing: 12) {
                             Spacer(minLength: 80)
                             Image(systemName: "waveform.badge.mic")
                                 .font(.system(size: 48))
                                 .foregroundStyle(.tertiary)
-                            Text("Import an audio file to transcribe")
+                            Text("Import or record audio to transcribe")
                                 .font(bodyFont)
                                 .foregroundStyle(.tertiary)
                             Spacer()
@@ -54,8 +54,18 @@ struct STTView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Audio file info + player
-            if viewModel.selectedAudioURL != nil {
+            // Recording indicator
+            if viewModel.isRecording {
+                RecordingIndicator(
+                    duration: viewModel.recordingDuration,
+                    audioLevel: viewModel.audioLevel
+                )
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+
+            // Audio file info + player (hidden while recording)
+            if viewModel.selectedAudioURL != nil && !viewModel.isRecording {
                 VStack(spacing: 4) {
                     // File name
                     if let fileName = viewModel.audioFileName {
@@ -111,45 +121,69 @@ struct STTView: View {
 
             // Bottom bar
             HStack(spacing: 8) {
-                // File import button
-                Button(action: { showFileImporter = true }) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc.badge.plus")
-                            Text("Import")
-                        }
-                        .font(buttonFont)
-                        .foregroundStyle(.primary)
-                        .frame(height: buttonHeight)
-                        .padding(.horizontal, 12)
-                        .background(Color.gray.opacity(0.2))
-                        .clipShape(Capsule())
-
-                        Image(systemName: "doc.badge.plus")
+                if !viewModel.isRecording {
+                    // File import button
+                    Button(action: { showFileImporter = true }) {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.badge.plus")
+                                Text("Import")
+                            }
                             .font(buttonFont)
                             .foregroundStyle(.primary)
-                            .frame(width: buttonHeight, height: buttonHeight)
+                            .frame(height: buttonHeight)
+                            .padding(.horizontal, 12)
                             .background(Color.gray.opacity(0.2))
+                            .clipShape(Capsule())
+
+                            Image(systemName: "doc.badge.plus")
+                                .font(buttonFont)
+                                .foregroundStyle(.primary)
+                                .frame(width: buttonHeight, height: buttonHeight)
+                                .background(Color.gray.opacity(0.2))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isGenerating)
+                }
+
+                // Record button
+                Button(action: {
+                    if viewModel.isRecording {
+                        viewModel.stopAndTranscribe()
+                    } else {
+                        viewModel.startRecording()
+                    }
+                }) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) {
+                            Image(systemName: viewModel.isRecording ? "stop.circle.fill" : "mic.fill")
+                            Text(viewModel.isRecording ? "Stop & Transcribe" : "Record")
+                        }
+                        .font(buttonFont)
+                        .fontWeight(viewModel.isRecording ? .medium : .regular)
+                        .foregroundStyle(viewModel.isRecording ? .white : .primary)
+                        .frame(height: buttonHeight)
+                        .padding(.horizontal, 12)
+                        .background(viewModel.isRecording ? Color.red : Color.gray.opacity(0.2))
+                        .clipShape(Capsule())
+
+                        Image(systemName: viewModel.isRecording ? "stop.circle.fill" : "mic.fill")
+                            .font(buttonFont)
+                            .foregroundStyle(viewModel.isRecording ? .white : .primary)
+                            .frame(width: buttonHeight, height: buttonHeight)
+                            .background(viewModel.isRecording ? Color.red : Color.gray.opacity(0.2))
                             .clipShape(Capsule())
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(viewModel.isGenerating || !viewModel.isModelLoaded)
 
-                // Settings button
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(buttonFont)
-                        .foregroundStyle(.primary)
-                        .frame(width: buttonHeight, height: buttonHeight)
-                        .background(Color.gray.opacity(0.2))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                // Copy button (when transcription exists)
-                if !viewModel.transcriptionText.isEmpty {
-                    Button(action: { viewModel.copyTranscription() }) {
-                        Image(systemName: "doc.on.doc")
+                if !viewModel.isRecording {
+                    // Settings button
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "slider.horizontal.3")
                             .font(buttonFont)
                             .foregroundStyle(.primary)
                             .frame(width: buttonHeight, height: buttonHeight)
@@ -157,75 +191,102 @@ struct STTView: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                }
 
-                // Stats after generation
-                if !viewModel.isGenerating && viewModel.tokensPerSecond > 0 {
-                    HStack(spacing: 8) {
-                        Label(
-                            String(format: "%.1f tok/s", viewModel.tokensPerSecond),
-                            systemImage: "speedometer"
-                        )
-                        Label(
-                            String(format: "%.1f GB", viewModel.peakMemory),
-                            systemImage: "memorychip"
-                        )
+                    // Copy button (when transcription exists)
+                    if !viewModel.transcriptionText.isEmpty {
+                        Button(action: { viewModel.copyTranscription() }) {
+                            Image(systemName: "doc.on.doc")
+                                .font(buttonFont)
+                                .foregroundStyle(.primary)
+                                .frame(width: buttonHeight, height: buttonHeight)
+                                .background(Color.gray.opacity(0.2))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+
+                    // Stats after generation
+                    if !viewModel.isGenerating && viewModel.tokensPerSecond > 0 {
+                        HStack(spacing: 8) {
+                            Label(
+                                String(format: "%.1f tok/s", viewModel.tokensPerSecond),
+                                systemImage: "speedometer"
+                            )
+                            Label(
+                                String(format: "%.1f GB", viewModel.peakMemory),
+                                systemImage: "memorychip"
+                            )
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    }
+                } else {
+                    // Cancel button while recording
+                    Button(action: { viewModel.cancelRecording() }) {
+                        Text("Cancel")
+                            .font(buttonFont)
+                            .foregroundStyle(.secondary)
+                            .frame(height: buttonHeight)
+                            .padding(.horizontal, 12)
+                            .background(Color.gray.opacity(0.2))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 Spacer()
 
-                // Transcribe / Stop button
-                if viewModel.isGenerating {
-                    Button(action: {
-                        viewModel.stop()
-                    }) {
-                        ViewThatFits(in: .horizontal) {
-                            Text("Stop")
-                                .font(buttonFont)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.white)
-                                .frame(height: buttonHeight)
-                                .padding(.horizontal, 16)
-                                .background(Color.red)
-                                .clipShape(Capsule())
+                // Transcribe / Stop button (for file transcription, not shown during recording)
+                if !viewModel.isRecording {
+                    if viewModel.isGenerating {
+                        Button(action: {
+                            viewModel.stop()
+                        }) {
+                            ViewThatFits(in: .horizontal) {
+                                Text("Stop")
+                                    .font(buttonFont)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.white)
+                                    .frame(height: buttonHeight)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.red)
+                                    .clipShape(Capsule())
 
-                            Image(systemName: "stop.fill")
-                                .font(buttonFont)
-                                .foregroundStyle(.white)
-                                .frame(width: buttonHeight, height: buttonHeight)
-                                .background(Color.red)
-                                .clipShape(Capsule())
+                                Image(systemName: "stop.fill")
+                                    .font(buttonFont)
+                                    .foregroundStyle(.white)
+                                    .frame(width: buttonHeight, height: buttonHeight)
+                                    .background(Color.red)
+                                    .clipShape(Capsule())
+                            }
                         }
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    Button(action: {
-                        viewModel.startTranscription()
-                    }) {
-                        ViewThatFits(in: .horizontal) {
-                            Text("Transcribe")
-                                .font(buttonFont)
-                                .fontWeight(.medium)
-                                .foregroundStyle(canTranscribe ? .white : .secondary)
-                                .frame(height: buttonHeight)
-                                .padding(.horizontal, 16)
-                                .background(canTranscribe ? Color.blue : Color.gray.opacity(0.2))
-                                .clipShape(Capsule())
+                        .buttonStyle(.plain)
+                    } else {
+                        Button(action: {
+                            viewModel.startTranscription()
+                        }) {
+                            ViewThatFits(in: .horizontal) {
+                                Text("Transcribe")
+                                    .font(buttonFont)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(canTranscribe ? .white : .secondary)
+                                    .frame(height: buttonHeight)
+                                    .padding(.horizontal, 16)
+                                    .background(canTranscribe ? Color.blue : Color.gray.opacity(0.2))
+                                    .clipShape(Capsule())
 
-                            Image(systemName: "waveform.badge.mic")
-                                .font(buttonFont)
-                                .foregroundStyle(canTranscribe ? .white : .secondary)
-                                .frame(width: buttonHeight, height: buttonHeight)
-                                .background(canTranscribe ? Color.blue : Color.gray.opacity(0.2))
-                                .clipShape(Capsule())
+                                Image(systemName: "waveform.badge.mic")
+                                    .font(buttonFont)
+                                    .foregroundStyle(canTranscribe ? .white : .secondary)
+                                    .frame(width: buttonHeight, height: buttonHeight)
+                                    .background(canTranscribe ? Color.blue : Color.gray.opacity(0.2))
+                                    .clipShape(Capsule())
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .disabled(!canTranscribe)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canTranscribe)
                 }
             }
             .padding(.horizontal)
@@ -276,6 +337,54 @@ struct STTView: View {
 
     private var canTranscribe: Bool {
         viewModel.selectedAudioURL != nil && !viewModel.isGenerating && viewModel.isModelLoaded
+    }
+}
+
+// MARK: - Recording Indicator
+
+private struct RecordingIndicator: View {
+    let duration: TimeInterval
+    let audioLevel: Float
+
+    @State private var isPulsing = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Pulsing red dot
+            Circle()
+                .fill(Color.red)
+                .frame(width: 10, height: 10)
+                .scaleEffect(isPulsing ? 1.3 : 1.0)
+                .opacity(isPulsing ? 0.7 : 1.0)
+                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+                .onAppear { isPulsing = true }
+
+            // Duration
+            Text(formatDuration(duration))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+
+            // Audio level meter
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.red.opacity(0.6))
+                    .frame(width: max(4, geo.size.width * CGFloat(audioLevel)))
+                    .animation(.easeOut(duration: 0.1), value: audioLevel)
+            }
+            .frame(height: 6)
+            .background(
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.gray.opacity(0.2))
+            )
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 
