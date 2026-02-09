@@ -233,6 +233,23 @@ struct STTView: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+
+                    // Stats during recording
+                    if viewModel.tokensPerSecond > 0 {
+                        HStack(spacing: 8) {
+                            Label(
+                                String(format: "%.1f tok/s", viewModel.tokensPerSecond),
+                                systemImage: "speedometer"
+                            )
+                            Label(
+                                String(format: "%.1f GB", viewModel.peakMemory),
+                                systemImage: "memorychip"
+                            )
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    }
                 }
 
                 Spacer()
