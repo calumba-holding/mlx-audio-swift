@@ -97,7 +97,7 @@ struct STTView: View {
 
             // Status/Progress
             VStack(spacing: 4) {
-                if !viewModel.generationProgress.isEmpty {
+                if !viewModel.generationProgress.isEmpty && !viewModel.isRecording {
                     HStack(spacing: 6) {
                         ProgressView()
                             .scaleEffect(0.6)
@@ -365,18 +365,7 @@ private struct RecordingIndicator: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
 
-            // Audio level meter
-            GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.red.opacity(0.6))
-                    .frame(width: max(4, geo.size.width * CGFloat(audioLevel)))
-                    .animation(.easeOut(duration: 0.1), value: audioLevel)
-            }
-            .frame(height: 6)
-            .background(
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.gray.opacity(0.2))
-            )
+            Spacer()
         }
         .padding(.vertical, 6)
     }

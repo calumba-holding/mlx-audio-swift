@@ -253,9 +253,6 @@ class STTViewModel {
         guard let (audio, endPos) = recorder.getAudio(from: fastChunkEnd) else { return }
         fastChunkEnd = endPos
 
-        isGenerating = true
-        generationProgress = "Transcribing..."
-
         do {
             for try await event in model.generateStream(
                 audio: audio,
@@ -281,9 +278,6 @@ class STTViewModel {
         } catch {
             errorMessage = "Transcription failed: \(error.localizedDescription)"
         }
-
-        generationProgress = ""
-        isGenerating = false
     }
 
     /// Fire-and-forget correction: re-transcribe all audio from confirmedSampleEnd in the background.
