@@ -283,23 +283,12 @@ struct STTView: View {
                         Button(action: {
                             viewModel.startTranscription()
                         }) {
-                            ViewThatFits(in: .horizontal) {
-                                Text("Transcribe")
-                                    .font(buttonFont)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(canTranscribe ? .white : .secondary)
-                                    .frame(height: buttonHeight)
-                                    .padding(.horizontal, 16)
+                            Image(systemName: "waveform.badge.mic")
+                                .font(buttonFont)
+                                .foregroundStyle(canTranscribe ? .white : .secondary)
+                                .frame(width: buttonHeight, height: buttonHeight)
                                     .background(canTranscribe ? Color.blue : Color.gray.opacity(0.2))
                                     .clipShape(Capsule())
-
-                                Image(systemName: "waveform.badge.mic")
-                                    .font(buttonFont)
-                                    .foregroundStyle(canTranscribe ? .white : .secondary)
-                                    .frame(width: buttonHeight, height: buttonHeight)
-                                    .background(canTranscribe ? Color.blue : Color.gray.opacity(0.2))
-                                    .clipShape(Capsule())
-                            }
                         }
                         .buttonStyle(.plain)
                         .disabled(!canTranscribe)
